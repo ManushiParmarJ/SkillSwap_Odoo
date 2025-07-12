@@ -12,7 +12,7 @@ A full-stack MERN application that enables users to list skills they offer and w
 - **Responsive Design**: Modern UI with Tailwind CSS
 - **Multi-Port Support**: Run frontend on different ports (3000-3005)
 
-## 🛠️ Tech Stack
+## 🛠️ Tech Stack 
 
 - **Frontend**: React, React Router, Tailwind CSS, Axios
 - **Backend**: Node.js, Express, MongoDB, JWT
