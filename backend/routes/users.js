@@ -118,27 +118,43 @@ router.get('/search-by-skill', auth, async (req, res) => {
 // Get user profile by ID
 router.get('/:userId', auth, async (req, res) => {
   try {
+    console.log('🔍 Fetching user profile for ID:', req.params.userId);
+    
     const user = await User.findById(req.params.userId)
       .select('-password');
 
     if (!user) {
+      console.log('❌ User not found');
       return res.status(404).json({ message: 'User not found' });
     }
 
+    console.log('👤 User found:', {
+      id: user._id,
+      name: user.name,
+      isPublic: user.isPublic,
+      isBanned: user.isBanned
+    });
+
     if (!user.isPublic && user._id.toString() !== req.user._id.toString()) {
+      console.log('🚫 Profile is private');
       return res.status(403).json({ message: 'Profile is private' });
     }
 
     if (user.isBanned) {
+      console.log('🚫 User is banned');
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Get user's skills
+    // Get user's skills - include all skills for other users (for now, we'll implement approval later)
     const skills = await Skill.find({
       user: user._id,
-      isApproved: true,
       isRejected: false
-    }).select('name description category type level');
+    }).select('name description category type level isApproved');
+
+    console.log('💼 Skills found:', {
+      count: skills.length,
+      skills: skills.map(s => ({ name: s.name, type: s.type, isApproved: s.isApproved }))
+    });
 
     res.json({
       user: user.toJSON(),

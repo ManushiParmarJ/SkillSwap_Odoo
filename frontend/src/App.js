@@ -6,6 +6,7 @@ import Footer from './components/layout/Footer';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import BrowseUsers from './pages/BrowseUsers';
@@ -44,6 +45,9 @@ function App() {
           } />
           <Route path="/register" element={
             user ? <Navigate to="/dashboard" replace /> : <Register />
+          } />
+          <Route path="/forgot-password" element={
+            user ? <Navigate to="/dashboard" replace /> : <ForgotPassword />
           } />
           
           {/* Protected routes */}

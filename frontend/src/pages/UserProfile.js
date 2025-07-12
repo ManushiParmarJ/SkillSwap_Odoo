@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
+import toast from 'react-hot-toast';
 import { 
   MapPin, 
   Star, 
@@ -9,7 +10,10 @@ import {
   MessageSquare, 
   Briefcase,
   Plus,
-  Clock
+  Clock,
+  AlertCircle,
+  CheckCircle,
+  X
 } from 'lucide-react';
 
 const UserProfile = () => {
@@ -17,6 +21,7 @@ const UserProfile = () => {
   const { user: currentUser } = useAuth();
   const [user, setUser] = useState(null);
   const [skills, setSkills] = useState([]);
+  const [mySkills, setMySkills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [swapData, setSwapData] = useState({
@@ -24,25 +29,46 @@ const UserProfile = () => {
     offeredSkillId: '',
     message: ''
   });
+  const [swapLoading, setSwapLoading] = useState(false);
 
   useEffect(() => {
     fetchUserProfile();
+    fetchMySkills();
   }, [userId]);
 
   const fetchUserProfile = async () => {
     try {
+      console.log('🔍 Fetching user profile for:', userId);
       const response = await axios.get(`/api/users/${userId}`);
+      console.log('📦 User profile response:', response.data);
       setUser(response.data.user);
       setSkills(response.data.skills);
     } catch (error) {
       console.error('Error fetching user profile:', error);
+      toast.error('Failed to load user profile');
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchMySkills = async () => {
+    try {
+      const response = await axios.get('/api/skills/my-skills');
+      setMySkills(response.data.skills);
+    } catch (error) {
+      console.error('Error fetching my skills:', error);
+    }
+  };
+
   const handleSwapRequest = async (e) => {
     e.preventDefault();
+    
+    if (!swapData.requestedSkillId || !swapData.offeredSkillId) {
+      toast.error('Please select both skills for the swap');
+      return;
+    }
+
+    setSwapLoading(true);
     
     try {
       const response = await axios.post('/api/swaps', {
@@ -52,12 +78,25 @@ const UserProfile = () => {
         message: swapData.message
       });
       
+      toast.success('Swap request sent successfully!');
       setShowSwapModal(false);
       setSwapData({ requestedSkillId: '', offeredSkillId: '', message: '' });
-      // You could show a success message here
     } catch (error) {
-      console.error('Error creating swap request:', error);
+      const message = error.response?.data?.message || 'Failed to send swap request';
+      toast.error(message);
+    } finally {
+      setSwapLoading(false);
     }
+  };
+
+  const validateSwapRequest = () => {
+    if (!swapData.requestedSkillId) {
+      return { valid: false, message: 'Please select a skill you want' };
+    }
+    if (!swapData.offeredSkillId) {
+      return { valid: false, message: 'Please select a skill you\'re offering' };
+    }
+    return { valid: true };
   };
 
   if (loading) {
@@ -79,8 +118,21 @@ const UserProfile = () => {
     );
   }
 
-  const offeredSkills = skills.filter(skill => skill.type === 'offered');
-  const wantedSkills = skills.filter(skill => skill.type === 'wanted');
+  const offeredSkills = skills?.filter(skill => skill.type === 'offered') || [];
+  const wantedSkills = skills?.filter(skill => skill.type === 'wanted') || [];
+  const myOfferedSkills = mySkills?.filter(skill => skill.type === 'offered' && skill.isApproved) || [];
+  const myWantedSkills = mySkills?.filter(skill => skill.type === 'wanted' && skill.isApproved) || [];
+
+  console.log('🔍 Skills filtering:', {
+    allSkills: skills,
+    offeredSkills,
+    wantedSkills,
+    mySkills,
+    myOfferedSkills,
+    myWantedSkills
+  });
+
+  const swapValidation = validateSwapRequest();
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -106,7 +158,7 @@ const UserProfile = () => {
               {currentUser._id !== userId && (
                 <button
                   onClick={() => setShowSwapModal(true)}
-                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   <MessageSquare className="h-4 w-4 mr-2" />
                   Request Swap
@@ -238,15 +290,23 @@ const UserProfile = () => {
       {/* Swap Request Modal */}
       {showSwapModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Request Skill Swap with {user.name}
-            </h3>
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Request Skill Swap with {user.name}
+              </h3>
+              <button
+                onClick={() => setShowSwapModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
             
             <form onSubmit={handleSwapRequest} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Skill You Want
+                  Skill You Want from {user.name}
                 </label>
                 <select
                   value={swapData.requestedSkillId}
@@ -261,6 +321,12 @@ const UserProfile = () => {
                     </option>
                   ))}
                 </select>
+                {offeredSkills.length === 0 && (
+                  <p className="text-sm text-red-600 mt-1">
+                    <AlertCircle className="h-4 w-4 inline mr-1" />
+                    No skills available
+                  </p>
+                )}
               </div>
 
               <div>
@@ -274,12 +340,18 @@ const UserProfile = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="">Select a skill</option>
-                  {wantedSkills.map((skill) => (
+                  {myOfferedSkills.map((skill) => (
                     <option key={skill._id} value={skill._id}>
                       {skill.name} ({skill.level})
                     </option>
                   ))}
                 </select>
+                {myOfferedSkills.length === 0 && (
+                  <p className="text-sm text-red-600 mt-1">
+                    <AlertCircle className="h-4 w-4 inline mr-1" />
+                    You need to add skills to offer
+                  </p>
+                )}
               </div>
 
               <div>
@@ -291,23 +363,47 @@ const UserProfile = () => {
                   onChange={(e) => setSwapData(prev => ({ ...prev, message: e.target.value }))}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Add a personal message..."
+                  placeholder="Add a personal message to explain your swap request..."
+                  maxLength={1000}
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  {swapData.message.length}/1000 characters
+                </p>
               </div>
+
+              {/* Validation Message */}
+              {!swapValidation.valid && (
+                <div className="flex items-center p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <AlertCircle className="h-4 w-4 text-red-600 mr-2" />
+                  <span className="text-sm text-red-600">{swapValidation.message}</span>
+                </div>
+              )}
 
               <div className="flex justify-end space-x-3">
                 <button
                   type="button"
                   onClick={() => setShowSwapModal(false)}
                   className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  disabled={swapLoading}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  disabled={!swapValidation.valid || swapLoading}
+                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Send Request
+                  {swapLoading ? (
+                    <>
+                      <div className="loading-spinner-small mr-2"></div>
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Send Request
+                    </>
+                  )}
                 </button>
               </div>
             </form>

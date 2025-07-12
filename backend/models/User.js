@@ -5,15 +5,14 @@ const userSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
-    trim: true,
-    maxlength: 100
+    trim: true
   },
   email: {
     type: String,
     required: true,
     unique: true,
-    lowercase: true,
-    trim: true
+    trim: true,
+    lowercase: true
   },
   password: {
     type: String,
@@ -22,43 +21,38 @@ const userSchema = new mongoose.Schema({
   },
   location: {
     type: String,
-    trim: true,
-    maxlength: 200
-  },
-  profilePhoto: {
-    type: String,
-    default: null
+    trim: true
   },
   isPublic: {
     type: Boolean,
     default: true
   },
-  availability: {
-    weekends: { type: Boolean, default: false },
-    evenings: { type: Boolean, default: false },
-    weekdays: { type: Boolean, default: false },
-    custom: { type: String, trim: true }
-  },
-  rating: {
-    average: { type: Number, default: 0 },
-    count: { type: Number, default: 0 }
+  isAdmin: {
+    type: Boolean,
+    default: false
   },
   isBanned: {
     type: Boolean,
     default: false
   },
-  role: {
-    type: String,
-    enum: ['user', 'admin'],
-    default: 'user'
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
+  availability: {
+    type: Map,
+    of: String,
+    default: {}
   },
   lastActive: {
     type: Date,
     default: Date.now
+  },
+  rating: {
+    average: { type: Number, default: 0 },
+    count: { type: Number, default: 0 }
+  },
+  resetOTP: { 
+    type: String 
+  },
+  resetOTPExpiry: { 
+    type: Date 
   }
 }, {
   timestamps: true
@@ -86,6 +80,8 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
 userSchema.methods.toJSON = function() {
   const user = this.toObject();
   delete user.password;
+  delete user.resetOTP;
+  delete user.resetOTPExpiry;
   return user;
 };
 

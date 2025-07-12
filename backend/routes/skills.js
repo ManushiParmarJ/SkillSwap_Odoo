@@ -43,6 +43,13 @@ router.post('/', auth, [
 
     const { name, description, category, type, level } = req.body;
 
+    console.log('🔧 Creating skill:', {
+      user: req.user._id,
+      name,
+      type,
+      level: level || 'intermediate'
+    });
+
     // Check if skill already exists for this user
     const existingSkill = await Skill.findOne({
       user: req.user._id,
@@ -51,6 +58,7 @@ router.post('/', auth, [
     });
 
     if (existingSkill) {
+      console.log('❌ Skill already exists for user');
       return res.status(400).json({ message: 'You already have this skill listed' });
     }
 
@@ -64,6 +72,12 @@ router.post('/', auth, [
     });
 
     await skill.save();
+    console.log('✅ Skill created successfully:', {
+      id: skill._id,
+      name: skill.name,
+      type: skill.type,
+      isApproved: skill.isApproved
+    });
 
     res.status(201).json({
       message: 'Skill added successfully',
@@ -275,6 +289,43 @@ router.get('/search', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('Search skills error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Test endpoint to check all skills (development only)
+router.get('/debug/all-skills', auth, async (req, res) => {
+  if (process.env.NODE_ENV !== 'development') {
+    return res.status(404).json({ message: 'Endpoint not available in production' });
+  }
+
+  try {
+    const allSkills = await Skill.find({}).populate('user', 'name email');
+    
+    const skillsByUser = {};
+    allSkills.forEach(skill => {
+      const userId = skill.user._id.toString();
+      if (!skillsByUser[userId]) {
+        skillsByUser[userId] = {
+          user: skill.user,
+          skills: []
+        };
+      }
+      skillsByUser[userId].skills.push({
+        id: skill._id,
+        name: skill.name,
+        type: skill.type,
+        isApproved: skill.isApproved,
+        isRejected: skill.isRejected
+      });
+    });
+
+    res.json({
+      totalSkills: allSkills.length,
+      skillsByUser
+    });
+  } catch (error) {
+    console.error('Debug skills error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

@@ -8,7 +8,12 @@ import {
   Clock, 
   Star,
   Filter,
-  Eye
+  Eye,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  Calendar,
+  User
 } from 'lucide-react';
 
 const MySwaps = () => {
@@ -17,6 +22,8 @@ const MySwaps = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedSwap, setSelectedSwap] = useState(null);
   const [showSwapModal, setShowSwapModal] = useState(false);
+  const [actionLoading, setActionLoading] = useState(null);
+  const [ratingModal, setRatingModal] = useState({ show: false, swapId: null, rating: 0, comment: '' });
 
   useEffect(() => {
     fetchSwaps();
@@ -38,6 +45,8 @@ const MySwaps = () => {
   };
 
   const handleSwapAction = async (swapId, action) => {
+    setActionLoading(swapId);
+    
     try {
       await axios.put(`/api/swaps/${swapId}/${action}`);
       toast.success(`Swap ${action}ed successfully!`);
@@ -45,13 +54,26 @@ const MySwaps = () => {
     } catch (error) {
       const message = error.response?.data?.message || `Failed to ${action} swap`;
       toast.error(message);
+    } finally {
+      setActionLoading(null);
     }
   };
 
-  const handleRateSwap = async (swapId, rating, comment) => {
+  const handleRateSwap = async (e) => {
+    e.preventDefault();
+    
+    if (!ratingModal.rating) {
+      toast.error('Please select a rating');
+      return;
+    }
+
     try {
-      await axios.post(`/api/swaps/${swapId}/rate`, { rating, comment });
+      await axios.post(`/api/swaps/${ratingModal.swapId}/rate`, { 
+        rating: ratingModal.rating, 
+        comment: ratingModal.comment 
+      });
       toast.success('Rating submitted successfully!');
+      setRatingModal({ show: false, swapId: null, rating: 0, comment: '' });
       fetchSwaps();
     } catch (error) {
       toast.error('Failed to submit rating');
@@ -67,6 +89,22 @@ const MySwaps = () => {
       case 'cancelled': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'completed': return <CheckCircle className="h-4 w-4" />;
+      case 'accepted': return <Check className="h-4 w-4" />;
+      case 'pending': return <Clock className="h-4 w-4" />;
+      case 'rejected': return <XCircle className="h-4 w-4" />;
+      case 'cancelled': return <X className="h-4 w-4" />;
+      default: return <Clock className="h-4 w-4" />;
+    }
+  };
+
+  const getSwapRole = (swap) => {
+    // This would need to be implemented based on current user context
+    return 'requester'; // Placeholder
   };
 
   if (loading) {
@@ -113,9 +151,12 @@ const MySwaps = () => {
                         {swap.recipient._id === swap.requester._id ? 'You' : swap.recipient.name}
                       </span>
                     </div>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(swap.status)}`}>
-                      {swap.status.charAt(0).toUpperCase() + swap.status.slice(1)}
-                    </span>
+                    <div className="flex items-center space-x-1">
+                      {getStatusIcon(swap.status)}
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(swap.status)}`}>
+                        {swap.status.charAt(0).toUpperCase() + swap.status.slice(1)}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex items-center space-x-2">
                     <span className="text-sm text-gray-500">
@@ -126,7 +167,7 @@ const MySwaps = () => {
                         setSelectedSwap(swap);
                         setShowSwapModal(true);
                       }}
-                      className="p-1 text-gray-400 hover:text-blue-600"
+                      className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
                     >
                       <Eye className="h-4 w-4" />
                     </button>
@@ -152,16 +193,26 @@ const MySwaps = () => {
                       <>
                         <button
                           onClick={() => handleSwapAction(swap._id, 'accept')}
-                          className="flex items-center px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+                          disabled={actionLoading === swap._id}
+                          className="flex items-center px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <Check className="h-3 w-3 mr-1" />
+                          {actionLoading === swap._id ? (
+                            <div className="loading-spinner-small mr-1"></div>
+                          ) : (
+                            <Check className="h-3 w-3 mr-1" />
+                          )}
                           Accept
                         </button>
                         <button
                           onClick={() => handleSwapAction(swap._id, 'reject')}
-                          className="flex items-center px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                          disabled={actionLoading === swap._id}
+                          className="flex items-center px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <X className="h-3 w-3 mr-1" />
+                          {actionLoading === swap._id ? (
+                            <div className="loading-spinner-small mr-1"></div>
+                          ) : (
+                            <X className="h-3 w-3 mr-1" />
+                          )}
                           Reject
                         </button>
                       </>
@@ -169,9 +220,14 @@ const MySwaps = () => {
                     {swap.requester._id !== swap.recipient._id && (
                       <button
                         onClick={() => handleSwapAction(swap._id, 'cancel')}
-                        className="flex items-center px-3 py-1 bg-gray-600 text-white rounded text-sm hover:bg-gray-700"
+                        disabled={actionLoading === swap._id}
+                        className="flex items-center px-3 py-1 bg-gray-600 text-white rounded text-sm hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <X className="h-3 w-3 mr-1" />
+                        {actionLoading === swap._id ? (
+                          <div className="loading-spinner-small mr-1"></div>
+                        ) : (
+                          <X className="h-3 w-3 mr-1" />
+                        )}
                         Cancel
                       </button>
                     )}
@@ -181,9 +237,14 @@ const MySwaps = () => {
                 {swap.status === 'accepted' && (
                   <button
                     onClick={() => handleSwapAction(swap._id, 'complete')}
-                    className="flex items-center px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                    disabled={actionLoading === swap._id}
+                    className="flex items-center px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Check className="h-3 w-3 mr-1" />
+                    {actionLoading === swap._id ? (
+                      <div className="loading-spinner-small mr-1"></div>
+                    ) : (
+                      <Check className="h-3 w-3 mr-1" />
+                    )}
                     Mark Complete
                   </button>
                 )}
@@ -194,12 +255,40 @@ const MySwaps = () => {
                     {[1, 2, 3, 4, 5].map((rating) => (
                       <button
                         key={rating}
-                        onClick={() => handleRateSwap(swap._id, rating, '')}
-                        className="text-yellow-400 hover:text-yellow-500"
+                        onClick={() => setRatingModal({ 
+                          show: true, 
+                          swapId: swap._id, 
+                          rating: rating, 
+                          comment: '' 
+                        })}
+                        className="text-yellow-400 hover:text-yellow-500 transition-colors"
                       >
                         <Star className="h-4 w-4" />
                       </button>
                     ))}
+                  </div>
+                )}
+
+                {/* Show existing ratings */}
+                {swap.status === 'completed' && (swap.rating?.fromRequester || swap.rating?.fromRecipient) && (
+                  <div className="mt-2 p-2 bg-gray-50 rounded">
+                    <p className="text-xs text-gray-600 mb-1">Ratings:</p>
+                    {swap.rating.fromRequester && (
+                      <div className="flex items-center text-xs text-gray-600">
+                        <span>Requester: {swap.rating.fromRequester.rating}/5</span>
+                        {swap.rating.fromRequester.comment && (
+                          <span className="ml-2 italic">"{swap.rating.fromRequester.comment}"</span>
+                        )}
+                      </div>
+                    )}
+                    {swap.rating.fromRecipient && (
+                      <div className="flex items-center text-xs text-gray-600">
+                        <span>Recipient: {swap.rating.fromRecipient.rating}/5</span>
+                        {swap.rating.fromRecipient.comment && (
+                          <span className="ml-2 italic">"{swap.rating.fromRecipient.comment}"</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -233,9 +322,12 @@ const MySwaps = () => {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-gray-700">Status:</span>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedSwap.status)}`}>
-                  {selectedSwap.status.charAt(0).toUpperCase() + selectedSwap.status.slice(1)}
-                </span>
+                <div className="flex items-center space-x-1">
+                  {getStatusIcon(selectedSwap.status)}
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedSwap.status)}`}>
+                    {selectedSwap.status.charAt(0).toUpperCase() + selectedSwap.status.slice(1)}
+                  </span>
+                </div>
               </div>
 
               <div>
@@ -290,6 +382,76 @@ const MySwaps = () => {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rating Modal */}
+      {ratingModal.show && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Rate This Swap</h3>
+            
+            <form onSubmit={handleRateSwap} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Rating
+                </label>
+                <div className="flex space-x-2">
+                  {[1, 2, 3, 4, 5].map((rating) => (
+                    <button
+                      key={rating}
+                      type="button"
+                      onClick={() => setRatingModal(prev => ({ ...prev, rating }))}
+                      className={`p-2 rounded ${
+                        ratingModal.rating >= rating 
+                          ? 'text-yellow-500' 
+                          : 'text-gray-300'
+                      } hover:text-yellow-500 transition-colors`}
+                    >
+                      <Star className="h-6 w-6" />
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {ratingModal.rating === 0 ? 'Select a rating' : `${ratingModal.rating} out of 5 stars`}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Comment (Optional)
+                </label>
+                <textarea
+                  value={ratingModal.comment}
+                  onChange={(e) => setRatingModal(prev => ({ ...prev, comment: e.target.value }))}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Share your experience..."
+                  maxLength={500}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  {ratingModal.comment.length}/500 characters
+                </p>
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setRatingModal({ show: false, swapId: null, rating: 0, comment: '' })}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!ratingModal.rating}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Submit Rating
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
