@@ -19,7 +19,7 @@ A full-stack MERN application that enables users to list skills they offer and w
 - **Database**: MongoDB
 - **Authentication**: JWT with persistent login
 
-## 📋 Prerequisites
+## 📋 Prerequisites 
 
 - Node.js (v14 or higher)
 - MongoDB (local installation or MongoDB Atlas)
